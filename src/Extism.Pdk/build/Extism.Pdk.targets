@@ -17,23 +17,43 @@
 		<UseAppHost>false</UseAppHost>
 	</PropertyGroup>
 
-	<Target Name="EnforceDotNet8" BeforeTargets="Build">
-		<Error Condition="'$(TargetFramework)' != 'net8.0'" Text="Extism PDK can only be used in projects targeting .NET 8. See https://github.com/extism/dotnet-pdk/issues/110" />
-	</Target>
+
+	<PropertyGroup>
+		<SelfContained>true</SelfContained>
+		<MSBuildEnableWorkloadResolver>false</MSBuildEnableWorkloadResolver>
+		<UseAppHost>false</UseAppHost>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.DotNet.ILCompiler.LLVM" Version="10.0.0-*" />
+		<PackageReference Include="runtime.$(NETCoreSdkPortableRuntimeIdentifier).Microsoft.DotNet.ILCompiler.LLVM" Version="10.0.0-*" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<DirectPInvoke Include="extism" />
+		<NativeLibrary Include="$(IntermediateOutputPath)extism/extism.out" />
+	</ItemGroup>
+
+<!--	<Target Name="EnforceDotNet8" BeforeTargets="Build">-->
+<!--		<Error Condition="'$(TargetFramework)' != 'net8.0'" Text="Extism PDK can only be used in projects targeting .NET 8. See https://github.com/extism/dotnet-pdk/issues/110" />-->
+<!--	</Target>-->
 
 	<UsingTask TaskName="GenerateFFITask" AssemblyFile="$(MSBuildThisFileDirectory)..\build\Extism.Pdk.MSBuild.dll" Condition="'$(RuntimeIdentifier)' == 'wasi-wasm'"/>
-	<Target Name="GenerateGlueCode" AfterTargets="Build" BeforeTargets="_BeforeWasmBuildApp" Condition="'$(RuntimeIdentifier)' == 'wasi-wasm'">
+	<Target Name="GenerateGlueCode" AfterTargets="Build" BeforeTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'wasi-wasm'">
 		<GenerateFFITask AssemblyPath="$(TargetPath)" OutputPath="$(IntermediateOutputPath)extism" ExtismPath="$(MSBuildThisFileDirectory)..\native\extism.c" />
-		<ItemGroup>
-			<NativeFileReference Include="$(IntermediateOutputPath)extism\*.c" />
-			<_WasmNativeFileForLinking Include="@(NativeFileReference)" />
+	</Target>
 
-			<!-- Wrap mono_runtime_run_main because we have to make sure at least one argument is passed in to Mono -->
-			<!-- See native/extism.c for the implementation -->
-			<_WasiSdkClangArgs Include="-Wl,--wrap=mono_runtime_run_main" />
+	<PropertyGroup>
+		<!-- Example default path if WASI_SDK_PATH is not passed in -->
+		<WASI_SDK_PATH Condition="'$(WASI_SDK_PATH)' == ''">/usr/local/wasi-sdk</WASI_SDK_PATH>
+		<PDKSourceFile>$(IntermediateOutputPath)extism\extism.c</PDKSourceFile>
+		<PDKOutputFile>$(IntermediateOutputPath)extism\extism.out</PDKOutputFile>
+	</PropertyGroup>
 
-			<!-- Wrap mono_wasm_load_runtime to ensure mono is loaded only once when _start is called after an exported function -->
-			<_WasiSdkClangArgs Include="-Wl,--wrap=mono_wasm_load_runtime" />
-		</ItemGroup>
+	<Target Name="CompilePDK" AfterTargets="GenerateGlueCode">
+		<Message Text="Compiling extism.c using clang from WASI SDK..." Importance="high" />
+		<Exec
+				Command="&quot;$(WASI_SDK_PATH)/bin/clang&quot; -O2 --target=wasm32-wasi -c &quot;$(PDKSourceFile)&quot; -o &quot;$(PDKOutputFile)&quot;"
+				WorkingDirectory="$(IntermediateOutputPath)" />
 	</Target>
 </Project>

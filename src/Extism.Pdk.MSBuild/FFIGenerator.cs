@@ -40,11 +40,6 @@ namespace Extism.Pdk.MSBuild
 
             var types = assemblies.SelectMany(a => a.MainModule.Types).ToArray();
 
-            var exportedMethods = types
-                    .SelectMany(t => t.Methods)
-                    .Where(m => m.IsStatic && m.CustomAttributes.Any(a => a.AttributeType.FullName == "System.Runtime.InteropServices.UnmanagedCallersOnlyAttribute"))
-                .ToArray();
-
             // TODO: also find F# module functions
             var importedMethods = types
                 .SelectMany(t => t.Methods)
@@ -52,7 +47,6 @@ namespace Extism.Pdk.MSBuild
                 .ToArray();
 
             var files = GenerateImports(importedMethods, _extism);
-            files.Add(GenerateExports(exportedMethods));
 
             return files;
         }
@@ -103,121 +97,6 @@ namespace Extism.Pdk.MSBuild
             return files;
         }
 
-        private FileEntry GenerateExports(MethodDefinition[] exportedMethods)
-        {
-            var sb = new StringBuilder();
-
-            if (exportedMethods.Length > 0)
-            {
-                sb.AppendLine(Preamble);
-                sb.AppendLine(
-                """          
-                // _initialize
-                void mono_wasm_load_runtime(const char* unused, int debug_level);
-
-                #ifdef WASI_AFTER_RUNTIME_LOADED_DECLARATIONS
-                // This is supplied from the MSBuild itemgroup @(WasiAfterRuntimeLoaded)
-                WASI_AFTER_RUNTIME_LOADED_DECLARATIONS
-                #endif
-
-                void initialize_runtime() {
-                    mono_wasm_load_runtime("", 0);
-                }
-
-                // end of _initialize
-                """);
-
-                sb.AppendLine(
-                """
-
-                void mono_wasm_invoke_method_ref(MonoMethod* method, MonoObject** this_arg_in, void* params[], MonoObject** _out_exc, MonoObject** out_result);
-                MonoString* mono_object_try_to_string (MonoObject *obj, MonoObject **exc, MonoError *error);
-                void mono_print_unhandled_exception(MonoObject *exc);
-
-                MonoMethod* method_extism_print_exception;
-                void extism_print_exception(MonoObject* exc)
-                {
-                    if (!method_extism_print_exception)
-                    {
-                        method_extism_print_exception = lookup_dotnet_method("Extism.Pdk.dll", "Extism", "Native", "PrintException", -1);
-
-                        if (method_extism_print_exception == NULL) {
-                            printf("Fatal: Failed to find Extism.Native.PrintException");
-                        }
-
-                        assert(method_extism_print_exception);
-                    }
-
-                    void* method_params[] = { exc };
-                    MonoObject* exception = NULL;
-                    MonoObject* result = NULL;
-                    mono_wasm_invoke_method_ref(method_extism_print_exception, NULL, method_params, &exception, &result);
-                
-                    if (exception != NULL) {
-                        const char* message = "An exception was thrown while trying to print the previous exception. Please check stderr for details.";
-                        mono_print_unhandled_exception(exception);
-                    }
-                }
-
-                """);
-
-                foreach (var method in exportedMethods)
-                {
-                    if (method.Parameters.Count > 0)
-                    {
-                        var parameterNames = string.Join(",", method.Parameters.Select(p => $"{p.ParameterType.Name} {p.Name}"));
-                        _logError($"Extism doesn't support exporting functions that have parameters: {method.DeclaringType.FullName}.{method.Name}({parameterNames})");
-                    }
-
-                    var assemblyFileName = method.Module.Assembly.Name.Name + ".dll";
-                    var attribute = method.CustomAttributes.First(a => a.AttributeType.Name == "UnmanagedCallersOnlyAttribute");
-
-                    var exportName = attribute.Fields.FirstOrDefault(p => p.Name == "EntryPoint").Argument.Value?.ToString() ?? method.Name;
-                    var parameterCount = method.Parameters.Count;
-                    var methodParams = string.Join(", ", Enumerable.Repeat("NULL", parameterCount));
-                    var returnType = method.ReturnType.FullName;
-
-                    sb.AppendLine($$"""
-MonoMethod* method_{{exportName}};
-__attribute__((export_name("{{exportName}}"))) int {{exportName}}()
-{
-    initialize_runtime();
-
-    if (!method_{{exportName}})
-    {
-        method_{{exportName}} = lookup_dotnet_method("{{assemblyFileName}}", "{{method.DeclaringType.Namespace}}", "{{method.DeclaringType.Name}}", "{{method.Name}}", -1);
-        assert(method_{{exportName}});
-    }
-
-    void* method_params[] = { };
-    MonoObject* exception = NULL;
-    MonoObject* result = NULL;
-    mono_wasm_invoke_method_ref(method_{{exportName}}, NULL, method_params, &exception, &result);
-   
-    if (exception != NULL) {
-        const char* message = "An exception was thrown when calling {{exportName}}. Please check stderr for details.";
-        mono_print_unhandled_exception(exception);
-
-        extism_print_exception(exception);
-        return 1;
-    }
-    
-    int int_result = 0;  // Default value
-
-    if (result != NULL) {
-        int_result = *(int*)mono_object_unbox(result);
-    }
-    
-    return int_result;
-}
-""");
-                }
-            }
-
-            sb.AppendLine();
-            return new FileEntry { Name = "exports.c", Content = sb.ToString() };
-        }
-
         private string ToImportStatement(MethodDefinition method)
         {
             var moduleName = method.PInvokeInfo.Module.Name;
@@ -261,20 +140,9 @@ __attribute__((export_name("{{exportName}}"))) int {{exportName}}()
         }
 
         private const string Preamble = """
-#include <string.h>
-#include <mono/metadata/assembly.h>
-#include <mono/metadata/exception.h>
-
-// https://github.com/dotnet/runtime/blob/v7.0.0/src/mono/wasi/mono-wasi-driver/driver.c
-#include <string.h>
-
-#include "driver.h"
-
 #include <stdint.h>
 #include <assert.h>
-#include <stdlib.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #define IMPORT(a, b) __attribute__((import_module(a), import_name(b)))
 
