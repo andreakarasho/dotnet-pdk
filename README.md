@@ -7,36 +7,25 @@ This library can be used to write Extism
 
 ## Prerequisites
 
-1. .NET SDK 8: https://dotnet.microsoft.com/en-us/download/dotnet/8.0
-2. WASI Workload:
-
-```
-dotnet workload install wasi-experimental
-```
-
+1. .NET SDK 9: https://dotnet.microsoft.com/en-us/download/dotnet/9.0
+2. WASI SDK: https://github.com/dotnet/runtimelab/blob/feature/NativeAOT-LLVM/docs/using-nativeaot/prerequisites.md#wasi-sdk
 3. Extract [WASI SDK](https://github.com/WebAssembly/wasi-sdk/releases) into
    local file system and set the `WASI_SDK_PATH` environment variable to point
    to it
 
 ## Install
 
-Create a new project and add this nuget package to your project:
-
-```
-dotnet new wasiconsole -o MyPlugin
-# OR, for F#: dotnet new console -o MyPlugin -lang F#
-cd MyPlugin
-dotnet add package Extism.Pdk
-```
+Create a new project and add this nuget package to your project following the compiling guide:
+https://github.com/dotnet/runtimelab/blob/feature/NativeAOT-LLVM/docs/using-nativeaot/compiling.md
 
 Update your `MyPlugin.csproj`/`MyPlugin.fsproj` as follows:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <RuntimeIdentifier>wasi-wasm</RuntimeIdentifier>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
   </PropertyGroup>
 </Project>
 ```
@@ -60,11 +49,6 @@ using Extism;
 namespace MyPlugin;
 public class Functions
 {
-    public static void Main()
-    {
-        // Note: a `Main` method is required for the app to compile
-    }
-
     [UnmanagedCallersOnly(EntryPoint = "greet")]
     public static int Greet()
     {
@@ -93,11 +77,6 @@ let Greet () : int32 =
     let greeting = $"Hello, {name}!"
     Pdk.SetOutput(greeting)
     0
-    
-[<EntryPoint>]
-let Main args  =
-    // Note: an `EntryPoint` function is required for the app to compile
-    0
 ```
 
 Some things to note about this code:
@@ -116,17 +95,17 @@ Some things to note about this code:
 Compile with this command:
 
 ```
-dotnet build
+dotnet publish -c Release
 ```
 
 This will create a `MyPlugin.wasm` file in
-`bin/Debug/net8.0/wasi-wasm/AppBundle`. Now, you can try out your plugin by
+`bin/Release/net9.0/wasi-wasm/native`. Now, you can try out your plugin by
 using any of the
 [Extism SDKs](https://extism.org/docs/category/integrate-into-your-codebase) or
 by using [Extism CLI](https://extism.org/docs/install)'s `run` command:
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm greet --input "Benjamin" --wasi
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm greet --input "Benjamin" --wasi
 # => Hello, Benjamin!
 ```
 
@@ -176,11 +155,11 @@ let Greet () =
 Now when we try again:
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm greet --input="Benjamin" --wasi
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm greet --input="Benjamin" --wasi
 # => Error: Sorry, we don't greet Benjamins!
 echo $? # print last status code
 # => 1
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm greet --input="Zach" --wasi
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm greet --input="Zach" --wasi
 # => Hello, Zach!
 echo $?
 # => 0
@@ -199,7 +178,7 @@ if (name == "Benjamin")
 Now when we try again:
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm greet --input="Benjamin" --wasi
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm greet --input="Benjamin" --wasi
 # => Error: System.ArgumentException: Sorry, we don't greet Benjamins!
    at MyPlugin.Functions.Greet()
 ```
@@ -254,7 +233,7 @@ let add () =
 package is installed in your project.
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm --wasi add --input='{"a": 20, "b": 21}'
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm --wasi add --input='{"a": 20, "b": 21}'
 # => {"Result":41}
 ```
 
@@ -304,7 +283,7 @@ To test it, the [Extism CLI](https://github.com/extism/cli) has a --config
 option that lets you pass in key=value pairs:
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm --wasi greet --config user=Benjamin
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm --wasi greet --config user=Benjamin
 # => Hello, Benjamin!
 ```
 
@@ -356,7 +335,7 @@ let count () =
 From [Extism CLI](https://github.com/extism/cli):
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm --wasi count --loop 3
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm --wasi count --loop 3
 1
 2
 3
@@ -403,7 +382,7 @@ let http_get () =
 From [Extism CLI](https://github.com/extism/cli):
 
 ```
-extism call .\bin\Debug\net8.0\wasi-wasm\AppBundle\MyPlugin.wasm --wasi http_get --allow-host='*.typicode.com'
+extism call .\bin\Release\net9.0\wasi-wasm\native\MyPlugin.wasm --wasi http_get --allow-host='*.typicode.com'
 {
   "userId": 1,
   "id": 1,
@@ -601,7 +580,7 @@ dotnet publish -c Release
 ```
 
 Now, you'll have a smaller `.wasm` file in
-`bin\Release\net8.0\wasi-wasm\AppBundle`.
+`bin\Release\net9.0\wasi-wasm\native\`.
 
 For more details, refer to
 [the official documentation](https://learn.microsoft.com/en-us/dotnet/core/deploying/trimming/trimming-options?pivots=dotnet-7-0#trimming-framework-library-features).
