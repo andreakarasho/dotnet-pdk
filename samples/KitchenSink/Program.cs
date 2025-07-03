@@ -5,8 +5,6 @@ using SampleLib;
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
 
-Class1.noop(); // Import Class1 from SampleLib so that it's included during compilation
-Console.WriteLine("Hello world!");
 
 namespace Functions
 {

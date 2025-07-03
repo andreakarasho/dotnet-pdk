@@ -1,29 +1,32 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net9.0</TargetFramework>
 		<RuntimeIdentifier>wasi-wasm</RuntimeIdentifier>
-		<OutputType>Exe</OutputType>
+		<OutputType>Library</OutputType>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
 
 	<ItemGroup>
+		<None Include="nuget.config" />
 		<Compile Include="Functions.fs" />
-		<Compile Include="Program.fs" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <PackageReference Include="Extism.runtime.win-x64" Version="1.9.1" />
-	</ItemGroup>
+
+<!--	<ItemGroup>-->
+<!--	  <PackageReference Include="Extism.runtime.win-x64" Version="1.9.1" />-->
+<!--	</ItemGroup>-->
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\src\Extism.Pdk\Extism.Pdk.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Update="FSharp.Core" Version="9.0.100" />
+		<PackageReference Include="FSharp.Core" Version="9.0.300" />
 	</ItemGroup>
-  
+
 	<!--This is only necessary for ProjectReference, when using the nuget package this will not be necessary-->
 	<Import Project="..\..\src\Extism.Pdk\build\Extism.Pdk.targets" />
 
