@@ -30,6 +30,21 @@ Update your `MyPlugin.csproj`/`MyPlugin.fsproj` as follows:
 </Project>
 ```
 
+Then add a `nuget.config` file in your root project directory with the following content:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+   <packageSources>
+      <!--To inherit the global NuGet package sources remove the <clear/> line below -->
+      <!-- <clear /> -->
+      <add key="dotnet9" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet9/nuget/v3/index.json" />
+      <add key="dotnet-public" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json" />
+      <add key="dotnet-experimental" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-experimental/nuget/v3/index.json" />
+   </packageSources>
+</configuration>
+```
+
 ## Getting Started
 
 The goal of writing an Extism plug-in is to compile your C#/F# code to a Wasm
